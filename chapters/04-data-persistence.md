@@ -295,77 +295,144 @@ Button("保存") {
 
 **何をしているか：**
 
+modelContext は SwiftData のデータを操作するためのもの。
+新しいメモを保存するときは modelContext.insert(memo) を使い、削除するときは modelContext.delete(memo) を使っている。
+
 **なぜこう書くのか：**
 
+SwiftData では、データの追加や削除を modelContext を通して行う。
+画面側では直接データベースを操作するのではなく、modelContext を使うことで SwiftData が自動的に変更を管理してくれる。
+
 **もしこう書かなかったら：**
+
+modelContext.insert(memo) を書かなければ、新しいメモを作っても保存されない。
+また、modelContext.delete(memo) を書かなければ、画面上で削除操作をしてもデータは消えない。
 
 ---
 
 ### @Queryによるデータ取得
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+@Query(sort: \Memo.createdAt, order: .reverse) private var memos: [Memo]
+
+var displayedMemos: [Memo] {
+    if sortByFavorite {
+        return memos.sorted { $0.isFavorite && !$1.isFavorite }
+    }
+    return memos
+}
+
+ForEach(displayedMemos) { memo in
+    NavigationLink(destination: MemoEditView(memo: memo)) {
+        MemoRow(memo: memo)
+    }
+}
 ```
 
 **何をしているか：**
 
+@Query を使って、SwiftData に保存されている Memo の一覧を取得している。
+sort: \Memo.createdAt, order: .reverse によって、新しいメモが上に表示されるようにしている。
+
 **なぜこう書くのか：**
 
+@Query を使うと、データベースの中身が変わったときに画面も自動で更新される。
+メモを追加・削除・編集したときに、自分でリストを更新する処理を書かなくてもよい。
+
 **もしこう書かなかったら：**
+
+@Query がないと、保存されているメモを一覧として取得できない。
+また、データを追加しても画面が自動で更新されず、リストに表示されない可能性がある。
 
 ---
 
 ### @AppStorageによる設定保存
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+@AppStorage("sortByFavorite") private var sortByFavorite: Bool = false
+@AppStorage("userName") private var userName: String = ""
+
+.navigationTitle(userName.isEmpty ? "メモ帳" : "\(userName)のメモ帳")
+
+SettingsView(userName: $userName, sortByFavorite: $sortByFavorite)
+
+TextField("あなたの名前", text: $userName)
+Toggle("お気に入りを上に表示", isOn: $sortByFavorite)
 ```
 
 **何をしているか：**
 
+@AppStorage を使って、ユーザー名と表示設定を保存している。
+ユーザー名を入力すると、ナビゲーションタイトルが「〇〇のメモ帳」に変わる。
+また、「お気に入りを上に表示」をオンにすると、お気に入りのメモが上に表示される。
+
 **なぜこう書くのか：**
+
+ユーザー名や表示設定のような小さなデータは、SwiftData よりも AppStorage の方が簡単に保存できる。
+@AppStorage は UserDefaults と連動しているため、アプリを閉じても設定が残る。
 
 **もしこう書かなかったら：**
 
----
+普通の @State だけで保存すると、アプリを閉じたときに設定が消えてしまう。
+そのため、ユーザー名や表示設定を毎回入力し直す必要がある。
 
-（必要に応じてセクションを増やす）
+---
 
 ## 新しく学んだSwiftの文法・API
 
-| 項目 | 説明 | 使用例 |
-|------|------|--------|
-| 例：`@Model` | SwiftDataでオブジェクトを永続化するためのマクロ | `@Model final class Memo { ... }` |
-| 例：`@Query` | データベースからデータを取得し、変更を自動で反映するプロパティラッパー | `@Query var memos: [Memo]` |
-| | | |
-| | | |
-| | | |
+| 項目                       | 説明                               | 使用例                                                            |
+| ------------------------ | -------------------------------- | -------------------------------------------------------------- |
+| `@Model`                 | SwiftDataで保存するデータモデルを定義するためのマクロ  | `@Model class Memo { ... }`                                    |
+| `@Query`                 | SwiftDataからデータを取得し、変更を自動で画面に反映する | `@Query var memos: [Memo]`                                     |
+| `modelContext`           | SwiftDataのデータを追加・削除するために使う       | `modelContext.insert(memo)`                                    |
+| `@AppStorage`            | アプリ設定などの小さなデータを保存する              | `@AppStorage("userName") var userName`                         |
+| `@Bindable`              | SwiftDataのモデルを画面上で編集可能にする        | `@Bindable var memo: Memo`                                     |
+| `.sheet`                 | 別画面をモーダル表示する                     | `.sheet(isPresented: $isShowingAddSheet)`                      |
+| `NavigationStack`        | 画面遷移を管理する                        | `NavigationStack { ... }`                                      |
+| `ContentUnavailableView` | データがないときの空画面を表示する                | `ContentUnavailableView("メモがありません", systemImage: "note.text")` |
+
 
 ## 自分の実験メモ
 
-（模範コードを改変して試したことを書く）
-
 **実験1：**
-- やったこと：
-- 結果：
-- わかったこと：
+- やったこと：SettingsView でユーザー名を入力して、メイン画面に戻った。
+- 結果：画面タイトルが「メモ帳」から「入力した名前のメモ帳」に変わった。
+- わかったこと：@AppStorage を使うと、設定画面で変更した内容がすぐに別の画面にも反映される。
 
 **実験2：**
-- やったこと：
-- 結果：
-- わかったこと：
+- やったこと：メモを追加してから、アプリを一度閉じてもう一度開いた。
+- 結果：追加したメモが消えずに残っていた。
+- わかったこと：SwiftData を使うと、アプリを閉じてもデータが保存される。
 
 ## AIに聞いて特に理解が深まった質問 TOP3
 
 1. **質問：**
+
+   @Model は何のために使うのか。
+   
    **得られた理解：**
+
+   @Model を付けることで、そのクラスを SwiftData に保存できるデータとして扱えることがわかった。
 
 2. **質問：**
+
+   メモを追加したのに一覧に表示されない原因は何か。
+   
    **得られた理解：**
 
+   Appファイルに .modelContainer(for: Memo.self) を設定しないと、SwiftData が正しく動かないことがわかった。
+
 3. **質問：**
+
+   @AppStorage と SwiftData の違いは何か。
+   
    **得られた理解：**
+
+   @AppStorage はユーザー名や設定のような小さいデータに向いていて、SwiftData はメモのような複数件の構造化データを保存するのに向いていることがわかった。
 
 ## この章のまとめ
 
-（この章で学んだ最も重要なことを、未来の自分が読み返したときに役立つように書く）
+この章では、SwiftUIアプリでデータを永続化する方法を学んだ。
+メモのような複数のデータは SwiftData を使って保存し、ユーザー名や表示設定のような小さな設定は AppStorage を使って保存する。
+また、@Query を使うことで保存されたデータを自動的に取得でき、modelContext を使って追加や削除ができることがわかった。
+今後アプリを作るときは、保存したいデータの種類によって SwiftData と AppStorage を使い分けることが大切だと思った。
